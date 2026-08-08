@@ -80,6 +80,39 @@ pub fn get_note(state: State<AppState>, id: String) -> AppResult<Option<String>>
 }
 
 #[tauri::command]
+pub fn update_note(state: State<AppState>, id: String, markdown: String) -> AppResult<()> {
+    let storage = state.storage.lock().unwrap();
+    if notes_db::get_note(storage.conn(), &id)?.is_none() {
+        return Err(AppError::new("记录不存在"));
+    }
+    save_note_file(&state.data_dir, &id, &markdown).map_err(AppError::new)?;
+    notes_db::refresh_body_index(storage.conn(), &id, &markdown)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn save_image(
+    state: State<AppState>,
+    note_id: String,
+    image: PastedImage,
+) -> AppResult<String> {
+    let storage = state.storage.lock().unwrap();
+    if notes_db::get_note(storage.conn(), &note_id)?.is_none() {
+        return Err(AppError::new("记录不存在"));
+    }
+    let rel = save_pasted_image(
+        &state.data_dir,
+        &note_id,
+        &image.filename,
+        &image.bytes,
+        &image.mime,
+    )
+    .map_err(AppError::new)?;
+    notes_db::set_ai_status(storage.conn(), &note_id, "pending")?;
+    Ok(rel)
+}
+
+#[tauri::command]
 pub fn rebuild_index(state: State<AppState>) -> AppResult<(usize, usize)> {
     let storage = state.storage.lock().unwrap();
     crate::storage::rebuild::rebuild(storage.conn(), &state.data_dir)

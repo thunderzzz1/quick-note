@@ -36,6 +36,8 @@ pub fn run() {
             commands::save_note,
             commands::list_notes,
             commands::get_note,
+            commands::update_note,
+            commands::save_image,
             commands::rebuild_index,
             commands::list_categories,
             commands::run_ai_org,
