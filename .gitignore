@@ -22,3 +22,6 @@ dist/
 Thumbs.db
 .idea/
 .vscode/
+
+# 手工验收用的临时数据目录
+testdata-tmp/

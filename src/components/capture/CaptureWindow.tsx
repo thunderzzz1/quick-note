@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Crepe } from '@milkdown/crepe';
 import { editorViewCtx, parserCtx } from '@milkdown/kit/core';
 import { listen } from '@tauri-apps/api/event';
@@ -29,14 +29,16 @@ export function CaptureWindow() {
   const currentId = useRef<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  useMemo(() => {
+  useEffect(() => {
     if (!hostRef.current || editorRef.current) return;
     const crepe = new Crepe({
       root: hostRef.current,
       defaultValue: '',
     });
     editorRef.current = crepe;
-    void crepe.create();
+    void crepe.create().then(() => {
+      crepe.editor.action((ctx) => ctx.get(editorViewCtx).focus());
+    });
   }, []);
 
   useEffect(() => {
