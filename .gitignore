@@ -1,0 +1,18 @@
+# 开发过程文件（brainstorm 可视化、讨论记录）
+.superpowers/
+
+# Rust
+target/
+
+# Node / 前端
+node_modules/
+dist/
+
+# 构建产物
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
