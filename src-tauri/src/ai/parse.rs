@@ -41,6 +41,12 @@ pub fn validate_against_batch(
     Ok(())
 }
 
+pub fn parse_daily_summary(raw: &str) -> Option<String> {
+    serde_json::from_str::<OrganizationResponse>(raw)
+        .ok()?
+        .daily_summary
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
