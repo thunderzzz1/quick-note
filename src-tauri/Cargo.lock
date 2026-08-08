@@ -2632,6 +2632,7 @@ name = "quicknote"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "dirs",
  "rusqlite",
  "serde",
  "serde_json",
