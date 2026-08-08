@@ -9,7 +9,12 @@ mod state;
 mod storage;
 
 use state::AppState;
-use tauri::{Emitter, Manager};
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::TrayIconBuilder,
+    Emitter, Manager,
+};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutEvent, ShortcutState};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,11 +28,15 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }))
         .manage(state)
-        .setup(|app| {
-            spawn_scheduler(app.handle().clone());
-            Ok(())
-        })
+        .setup(setup)
         .invoke_handler(tauri::generate_handler![
             commands::save_note,
             commands::list_notes,
@@ -51,6 +60,48 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show", "打开 QuickNote", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show, &quit])?;
+
+    TrayIconBuilder::with_id("main")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "quit" => app.exit(0),
+            "show" => {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
+            }
+            _ => {}
+        })
+        .build(app)?;
+
+    let capture = app
+        .get_webview_window("capture")
+        .ok_or("capture window missing")?;
+    let hotkey = app.state::<AppState>().config.lock().unwrap().hotkey.clone();
+    let shortcut: Shortcut = hotkey.parse().map_err(|e| format!("快捷键格式错误: {e}"))?;
+    app.global_shortcut()
+        .on_shortcut(shortcut, move |app, _shortcut, event: ShortcutEvent| {
+        if event.state() == ShortcutState::Pressed {
+            if capture.is_visible().unwrap_or(false) {
+                let _ = capture.hide();
+            } else {
+                let _ = capture.show();
+                let _ = capture.set_focus();
+                let _ = app.emit("capture-focus", ());
+            }
+        }
+    })?;
+
+    spawn_scheduler(app.handle().clone());
+    Ok(())
 }
 
 fn spawn_scheduler(app: tauri::AppHandle) {

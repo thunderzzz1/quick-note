@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Crepe } from '@milkdown/crepe';
 import { editorViewCtx, parserCtx } from '@milkdown/kit/core';
+import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useAutosave } from '../../lib/autosave';
 import {
@@ -42,6 +43,18 @@ export function CaptureWindow() {
     return () => {
       void editorRef.current?.destroy();
       editorRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const unlisten = listen('capture-focus', () => {
+      const crepe = editorRef.current;
+      if (crepe) {
+        crepe.editor.action((ctx) => ctx.get(editorViewCtx).focus());
+      }
+    });
+    return () => {
+      void unlisten.then((f) => f());
     };
   }, []);
 

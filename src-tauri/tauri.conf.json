@@ -12,9 +12,21 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "QuickNote",
-        "width": 800,
-        "height": 600
+        "width": 1000,
+        "height": 680,
+        "visible": true
+      },
+      {
+        "label": "capture",
+        "title": "QuickNote 速记",
+        "width": 420,
+        "height": 360,
+        "resizable": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false
       }
     ],
     "security": {
