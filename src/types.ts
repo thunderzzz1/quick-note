@@ -32,3 +32,14 @@ export interface Category {
   sort_order: number;
   created_at: string;
 }
+
+export interface Suggestion {
+  id: number;
+  note_id: string;
+  ai_category: string | null;
+  new_category_proposal: string | null;
+  summary: string | null;
+  keywords: string | null;
+  status: 'suggested' | 'accepted' | 'adjusted' | 'skipped';
+  created_at: string;
+}
