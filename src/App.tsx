@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { CaptureWindow } from './components/capture/CaptureWindow';
 import { MainWindow } from './components/main/MainWindow';
+import { FirstRunWizard } from './components/onboarding/FirstRunWizard';
+import { api } from './lib/tauri';
 
 export default function App() {
   const [label, setLabel] = useState<string | null>(null);
+  const [configured, setConfigured] = useState<boolean | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -21,7 +24,14 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (label === 'main') {
+      void api.getSettings().then((s) => setConfigured(s.configured));
+    }
+  }, [label]);
+
   if (label === null) return null;
   if (label === 'capture') return <CaptureWindow />;
+  if (configured === false) return <FirstRunWizard onDone={() => setConfigured(true)} />;
   return <MainWindow />;
 }

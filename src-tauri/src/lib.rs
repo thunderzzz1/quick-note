@@ -18,15 +18,11 @@ pub fn run() {
     std::fs::create_dir_all(&cfg.data_dir).expect("数据目录创建失败");
     let storage =
         storage::Storage::open(&cfg.data_dir.join("quicknote.db")).expect("数据库初始化失败");
-    let ai = ai::AiClient::new(
-        cfg.ai.base_url.clone(),
-        cfg.ai.model.clone(),
-        cfg.ai.api_key.clone(),
-    );
-    let state = AppState::new(cfg, storage, ai);
+    let state = AppState::new(cfg, storage);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(state)
         .setup(|app| {
             spawn_scheduler(app.handle().clone());
@@ -37,6 +33,10 @@ pub fn run() {
             commands::list_notes,
             commands::list_notes_by_category,
             commands::get_data_dir,
+            commands::get_settings,
+            commands::update_settings,
+            commands::init_data_dir,
+            commands::migrate_data_dir,
             commands::get_note,
             commands::update_note,
             commands::save_image,

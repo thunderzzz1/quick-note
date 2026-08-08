@@ -10,6 +10,120 @@ use crate::storage::categories as categories_db;
 use crate::storage::notes as notes_db;
 use crate::storage::suggestions as suggestions_db;
 
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+pub struct SettingsDto {
+    pub data_dir: String,
+    pub configured: bool,
+    pub hotkey: String,
+    pub org_time: String,
+    pub auto_org_enabled: bool,
+    pub ai_base_url: String,
+    pub ai_model: String,
+    pub ai_api_key: String,
+}
+
+impl From<crate::config::Config> for SettingsDto {
+    fn from(c: crate::config::Config) -> Self {
+        Self {
+            data_dir: c.data_dir.to_string_lossy().to_string(),
+            configured: c.configured,
+            hotkey: c.hotkey,
+            org_time: c.org_time,
+            auto_org_enabled: c.auto_org_enabled,
+            ai_base_url: c.ai.base_url,
+            ai_model: c.ai.model,
+            ai_api_key: c.ai.api_key,
+        }
+    }
+}
+
+#[tauri::command]
+pub fn get_settings(state: State<AppState>) -> AppResult<SettingsDto> {
+    let cfg = state.config.lock().unwrap().clone();
+    Ok(cfg.into())
+}
+
+#[tauri::command]
+pub fn update_settings(state: State<AppState>, s: SettingsDto) -> AppResult<()> {
+    let mut cfg = state.config.lock().unwrap();
+    cfg.hotkey = s.hotkey;
+    cfg.org_time = s.org_time;
+    cfg.auto_org_enabled = s.auto_org_enabled;
+    cfg.ai.base_url = s.ai_base_url;
+    cfg.ai.model = s.ai_model;
+    cfg.ai.api_key = s.ai_api_key;
+    let root = state.data_dir.lock().unwrap().clone();
+    crate::config::save(&root, &cfg).map_err(AppError::new)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn init_data_dir(state: State<AppState>, dir: String) -> AppResult<()> {
+    let path = std::path::PathBuf::from(&dir);
+    std::fs::create_dir_all(&path).map_err(AppError::from)?;
+    let cfg = crate::config::load(&path).map_err(AppError::new)?;
+    let storage = crate::storage::Storage::open(&path.join("quicknote.db"))?;
+    let mut guard = state.config.lock().unwrap();
+    guard.data_dir = path.clone();
+    guard.configured = true;
+    crate::config::save(&path, &guard).map_err(AppError::new)?;
+    drop(guard);
+    *state.storage.lock().unwrap() = storage;
+    *state.data_dir.lock().unwrap() = path;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn migrate_data_dir(state: State<AppState>, new_dir: String) -> AppResult<String> {
+    let target = std::path::PathBuf::from(&new_dir);
+    std::fs::create_dir_all(&target).map_err(AppError::from)?;
+    let source = state.data_dir.lock().unwrap().clone();
+    if source == target {
+        return Ok(target.to_string_lossy().into_owned());
+    }
+
+    {
+        let storage = state.storage.lock().unwrap();
+        storage
+            .conn()
+            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+            .map_err(AppError::from)?;
+    }
+
+    for name in ["config.json", "quicknote.db", "notes", "attachments"] {
+        let from = source.join(name);
+        if !from.exists() {
+            continue;
+        }
+        copy_recursive(&from, &target.join(name)).map_err(AppError::from)?;
+    }
+
+    let cfg = crate::config::load(&target).map_err(AppError::new)?;
+    let storage = crate::storage::Storage::open(&target.join("quicknote.db"))?;
+    let mut guard = state.config.lock().unwrap();
+    guard.data_dir = target.clone();
+    guard.configured = true;
+    crate::config::save(&target, &guard).map_err(AppError::new)?;
+    drop(guard);
+    *state.storage.lock().unwrap() = storage;
+    *state.data_dir.lock().unwrap() = target.clone();
+    Ok(target.to_string_lossy().into_owned())
+}
+
+fn copy_recursive(from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
+    if from.is_dir() {
+        std::fs::create_dir_all(to)?;
+        for entry in std::fs::read_dir(from)? {
+            let entry = entry?;
+            copy_recursive(&entry.path(), &to.join(entry.file_name()))?;
+        }
+        Ok(())
+    } else {
+        std::fs::copy(from, to)?;
+        Ok(())
+    }
+}
+
 #[derive(serde::Deserialize)]
 pub struct PastedImage {
     pub filename: String,
@@ -37,7 +151,7 @@ pub fn save_note(
 
     let markdown_path = format!("notes/{}/{}/{}.md", &id[0..4], &id[4..6], id);
     let mut image_refs = Vec::new();
-    let root = state.data_dir.clone();
+    let root = state.data_dir.lock().unwrap().clone();
     for img in images {
         let rel = save_pasted_image(&root, &id, &img.filename, &img.bytes, &img.mime)
             .map_err(AppError::new)?;
@@ -79,7 +193,12 @@ pub fn list_notes_by_category(
 
 #[tauri::command]
 pub fn get_data_dir(state: State<AppState>) -> AppResult<String> {
-    Ok(state.data_dir.to_string_lossy().into_owned())
+    Ok(state
+        .data_dir
+        .lock()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned())
 }
 
 #[tauri::command]
@@ -90,7 +209,8 @@ pub fn get_note(state: State<AppState>, id: String) -> AppResult<Option<String>>
     if exists.is_none() {
         return Ok(None);
     }
-    Ok(Some(read_note_file(&state.data_dir, &id).map_err(AppError::new)?))
+    let root = state.data_dir.lock().unwrap().clone();
+    Ok(Some(read_note_file(&root, &id).map_err(AppError::new)?))
 }
 
 #[tauri::command]
@@ -99,7 +219,8 @@ pub fn update_note(state: State<AppState>, id: String, markdown: String) -> AppR
     if notes_db::get_note(storage.conn(), &id)?.is_none() {
         return Err(AppError::new("记录不存在"));
     }
-    save_note_file(&state.data_dir, &id, &markdown).map_err(AppError::new)?;
+    let root = state.data_dir.lock().unwrap().clone();
+    save_note_file(&root, &id, &markdown).map_err(AppError::new)?;
     notes_db::refresh_body_index(storage.conn(), &id, &markdown)?;
     Ok(())
 }
@@ -114,8 +235,9 @@ pub fn save_image(
     if notes_db::get_note(storage.conn(), &note_id)?.is_none() {
         return Err(AppError::new("记录不存在"));
     }
+    let root = state.data_dir.lock().unwrap().clone();
     let rel = save_pasted_image(
-        &state.data_dir,
+        &root,
         &note_id,
         &image.filename,
         &image.bytes,
@@ -129,7 +251,8 @@ pub fn save_image(
 #[tauri::command]
 pub fn rebuild_index(state: State<AppState>) -> AppResult<(usize, usize)> {
     let storage = state.storage.lock().unwrap();
-    crate::storage::rebuild::rebuild(storage.conn(), &state.data_dir)
+    let root = state.data_dir.lock().unwrap().clone();
+    crate::storage::rebuild::rebuild(storage.conn(), &root)
 }
 
 #[tauri::command]
@@ -149,7 +272,7 @@ pub struct OrgRunResult {
 pub async fn run_ai_org_inner(app: &AppHandle) -> AppResult<OrgRunResult> {
     let state = app.state::<AppState>();
 
-    let (batch, categories) = {
+    let (batch, categories, ai_config) = {
         let cfg = state.config.lock().unwrap();
         if cfg.ai.api_key.is_empty() {
             return Err(AppError::new("请先在设置中配置 API Key"));
@@ -162,7 +285,15 @@ pub async fn run_ai_org_inner(app: &AppHandle) -> AppResult<OrgRunResult> {
             .filter(|c| c.enabled)
             .map(|c| c.name)
             .collect();
-        (batch, cats)
+        (
+            batch,
+            cats,
+            (
+                cfg.ai.base_url.clone(),
+                cfg.ai.model.clone(),
+                cfg.ai.api_key.clone(),
+            ),
+        )
     };
 
     if batch.is_empty() {
@@ -176,19 +307,23 @@ pub async fn run_ai_org_inner(app: &AppHandle) -> AppResult<OrgRunResult> {
     let mut failed = Vec::new();
     let mut all_suggestions = Vec::new();
     let mut daily_summary: Option<String> = None;
+    let root = state.data_dir.lock().unwrap().clone();
 
     for chunk in batch.chunks(30) {
         let mut notes_text: Vec<(String, String)> = Vec::new();
         for id in chunk {
-            let text =
-                read_note_file(&state.data_dir, id).unwrap_or_else(|_| "[读取失败]".to_string());
+            let text = read_note_file(&root, id).unwrap_or_else(|_| "[读取失败]".to_string());
             notes_text.push((id.clone(), text));
         }
         let system = build_system_prompt(&categories, 10);
         let user = build_user_payload(&notes_text, "请只输出 JSON");
         let mut attempt = 0;
         let parsed = loop {
-            let raw = match state.ai.chat_json(&system, user.clone()).await {
+            let raw = match state
+                .ai
+                .chat_json(&ai_config.0, &ai_config.1, &ai_config.2, &system, user.clone())
+                .await
+            {
                 Ok(v) => v.to_string(),
                 Err(e) => {
                     failed.push(format!("{}: {}", chunk[0], e.error));
@@ -257,7 +392,8 @@ pub async fn run_ai_org_inner(app: &AppHandle) -> AppResult<OrgRunResult> {
 
     let mut cfg = state.config.lock().unwrap();
     cfg.last_org_date = Some(chrono::Local::now().format("%Y-%m-%d").to_string());
-    crate::config::save(&state.data_dir, &cfg).map_err(AppError::new)?;
+    let root = state.data_dir.lock().unwrap().clone();
+    crate::config::save(&root, &cfg).map_err(AppError::new)?;
 
     Ok(OrgRunResult {
         processed: batch.len(),

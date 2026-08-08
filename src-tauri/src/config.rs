@@ -24,6 +24,7 @@ impl Default for AiConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub data_dir: PathBuf,
+    pub configured: bool,
     pub hotkey: String,
     pub org_time: String, // "HH:MM"，24 小时制
     pub auto_org_enabled: bool,
@@ -35,6 +36,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             data_dir: default_data_dir(),
+            configured: false,
             hotkey: "Alt+Shift+N".into(),
             org_time: "22:00".into(),
             auto_org_enabled: true,

@@ -36,4 +36,19 @@ export const api = {
     }),
   skipSuggestion: (id: number) => invoke<void>('skip_suggestion', { suggestionId: id }),
   acceptAll: (date: string) => invoke<number>('accept_all', { date }),
+  getSettings: () => invoke<SettingsDto>('get_settings'),
+  updateSettings: (s: SettingsDto) => invoke<void>('update_settings', { s }),
+  initDataDir: (dir: string) => invoke<void>('init_data_dir', { dir }),
+  migrateDataDir: (newDir: string) => invoke<string>('migrate_data_dir', { newDir }),
 };
+
+export interface SettingsDto {
+  data_dir: string;
+  configured: boolean;
+  hotkey: string;
+  org_time: string;
+  auto_org_enabled: boolean;
+  ai_base_url: string;
+  ai_model: string;
+  ai_api_key: string;
+}

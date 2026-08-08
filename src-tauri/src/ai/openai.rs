@@ -1,30 +1,27 @@
 use serde_json::{json, Value};
 
 pub struct OpenAiClient {
-    base_url: String,
-    model: String,
-    api_key: String,
     http: reqwest::Client,
 }
 
 impl OpenAiClient {
-    pub fn new(base_url: String, model: String, api_key: String) -> Self {
+    pub fn new() -> Self {
         Self {
-            base_url,
-            model,
-            api_key,
             http: reqwest::Client::new(),
         }
     }
 
     pub async fn chat_json(
         &self,
+        base_url: &str,
+        model: &str,
+        api_key: &str,
         system: &str,
         user: Value,
     ) -> Result<Value, crate::errors::AppError> {
-        let url = format!("{}/chat/completions", self.base_url.trim_end_matches('/'));
+        let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
         let body = json!({
-            "model": self.model,
+            "model": model,
             "temperature": 0,
             "response_format": { "type": "json_object" },
             "messages": [
@@ -32,7 +29,7 @@ impl OpenAiClient {
                 { "role": "user", "content": serde_json::to_string(&user).map_err(|e| crate::errors::AppError::new(e.to_string()))? }
             ]
         });
-        let resp = self.http.post(&url).bearer_auth(&self.api_key).json(&body).send().await?;
+        let resp = self.http.post(&url).bearer_auth(api_key).json(&body).send().await?;
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
