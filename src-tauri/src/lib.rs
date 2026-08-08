@@ -35,6 +35,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::save_note,
             commands::list_notes,
+            commands::list_notes_by_category,
+            commands::get_data_dir,
             commands::get_note,
             commands::update_note,
             commands::save_image,

@@ -69,6 +69,20 @@ pub fn list_notes(
 }
 
 #[tauri::command]
+pub fn list_notes_by_category(
+    state: State<AppState>,
+    category_id: i64,
+) -> AppResult<Vec<notes_db::NoteMeta>> {
+    let storage = state.storage.lock().unwrap();
+    Ok(notes_db::list_notes_by_category(storage.conn(), category_id)?)
+}
+
+#[tauri::command]
+pub fn get_data_dir(state: State<AppState>) -> AppResult<String> {
+    Ok(state.data_dir.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
 pub fn get_note(state: State<AppState>, id: String) -> AppResult<Option<String>> {
     let storage = state.storage.lock().unwrap();
     let exists = notes_db::get_note(storage.conn(), &id)?;
