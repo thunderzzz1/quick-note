@@ -17,4 +17,10 @@ impl From<std::io::Error> for AppError {
     }
 }
 
+impl From<rusqlite::Error> for AppError {
+    fn from(e: rusqlite::Error) -> Self {
+        Self::new(format!("database error: {e}"))
+    }
+}
+
 pub type AppResult<T> = Result<T, AppError>;
