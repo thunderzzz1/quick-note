@@ -1,5 +1,6 @@
 mod errors;
 mod io_atomic;
+mod notes_fs;
 mod paths;
 mod storage;
 mod config;
