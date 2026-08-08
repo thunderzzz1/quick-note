@@ -70,7 +70,10 @@ export function CaptureWindow() {
     setRefreshKey((k) => k + 1);
   };
 
-  const { saving, flush } = useAutosave(() => editorRef.current?.getMarkdown() ?? '', doSave);
+  const { saving, lastSavedAt, flush } = useAutosave(
+    () => editorRef.current?.getMarkdown() ?? '',
+    doSave,
+  );
   const flushRef = useRef(flush);
   flushRef.current = flush;
 
@@ -99,6 +102,11 @@ export function CaptureWindow() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        void flushRef.current();
+        return;
+      }
       if (e.key === 'Escape') {
         void flushRef.current();
         void getCurrentWindow().hide();
@@ -117,8 +125,22 @@ export function CaptureWindow() {
 
   return (
     <div className="h-screen flex flex-col bg-white">
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-100">
+        <span className="text-xs text-gray-400">
+          {saving
+            ? '保存中…'
+            : lastSavedAt
+              ? `已保存 ${new Date(lastSavedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+              : '未保存'}
+        </span>
+        <button
+          onClick={() => void flush()}
+          className="ml-auto bg-blue-500 text-white text-xs rounded px-3 py-1"
+        >
+          保存
+        </button>
+      </div>
       <div ref={hostRef} className="flex-1 overflow-y-auto px-3 py-2" />
-      {saving ? <div className="px-3 pb-1 text-xs text-gray-400">保存中…</div> : null}
       <TodayStrip refreshKey={refreshKey} />
     </div>
   );

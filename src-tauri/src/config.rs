@@ -79,6 +79,33 @@ pub fn save(data_dir: &Path, cfg: &Config) -> Result<(), String> {
     Ok(())
 }
 
+/// 数据目录指针文件：位于系统配置目录（Windows 为 %APPDATA%），
+/// 记录用户首次启动时选择的数据目录，保证重启后仍能找回。
+fn data_dir_pointer_path() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("QuickNote")
+        .join("app.json")
+}
+
+pub fn save_data_dir_pointer(dir: &Path) -> Result<(), String> {
+    let path = data_dir_pointer_path();
+    let parent = path
+        .parent()
+        .ok_or_else(|| "无法定位配置目录".to_string())?;
+    std::fs::create_dir_all(parent).map_err(|e| format!("创建配置目录失败: {e}"))?;
+    let raw = serde_json::json!({ "data_dir": dir }).to_string();
+    atomic_write(&path, raw.as_bytes()).map_err(|e| format!("写入数据目录指针失败: {e}"))?;
+    Ok(())
+}
+
+pub fn load_data_dir_pointer() -> Option<PathBuf> {
+    let path = data_dir_pointer_path();
+    let raw = std::fs::read_to_string(path).ok()?;
+    let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    v.get("data_dir")?.as_str().map(PathBuf::from)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

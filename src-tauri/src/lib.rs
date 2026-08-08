@@ -12,13 +12,13 @@ use state::AppState;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    Emitter, Manager,
+    Emitter, Manager, WindowEvent,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutEvent, ShortcutState};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let data_dir = config::default_data_dir();
+    let data_dir = config::load_data_dir_pointer().unwrap_or_else(config::default_data_dir);
     let cfg = config::load(&data_dir).expect("配置初始化失败");
     std::fs::create_dir_all(&cfg.data_dir).expect("数据目录创建失败");
     let storage =
@@ -63,6 +63,19 @@ pub fn run() {
 }
 
 fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    // 关闭按钮改为隐藏窗口，而不是销毁：保证托盘常驻后快捷键仍可呼出。
+    for label in ["main", "capture"] {
+        if let Some(w) = app.get_webview_window(label) {
+            let w2 = w.clone();
+            w.on_window_event(move |event| {
+                if let WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = w2.hide();
+                }
+            });
+        }
+    }
+
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
     let show = MenuItem::with_id(app, "show", "打开 QuickNote", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &quit])?;

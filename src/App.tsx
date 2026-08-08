@@ -30,7 +30,13 @@ export default function App() {
     }
   }, [label]);
 
-  if (label === null) return null;
+  if (label === null) {
+    return (
+      <div className="h-screen grid place-items-center bg-white text-gray-400 text-sm">
+        QuickNote 加载中…
+      </div>
+    );
+  }
   if (label === 'capture') return <CaptureWindow />;
   if (configured === false) return <FirstRunWizard onDone={() => setConfigured(true)} />;
   return <MainWindow />;

@@ -69,7 +69,8 @@ pub fn init_data_dir(state: State<AppState>, dir: String) -> AppResult<()> {
     crate::config::save(&path, &guard).map_err(AppError::new)?;
     drop(guard);
     *state.storage.lock().unwrap() = storage;
-    *state.data_dir.lock().unwrap() = path;
+    *state.data_dir.lock().unwrap() = path.clone();
+    crate::config::save_data_dir_pointer(&path).map_err(AppError::new)?;
     Ok(())
 }
 
@@ -107,6 +108,7 @@ pub fn migrate_data_dir(state: State<AppState>, new_dir: String) -> AppResult<St
     drop(guard);
     *state.storage.lock().unwrap() = storage;
     *state.data_dir.lock().unwrap() = target.clone();
+    crate::config::save_data_dir_pointer(&target).map_err(AppError::new)?;
     Ok(target.to_string_lossy().into_owned())
 }
 
