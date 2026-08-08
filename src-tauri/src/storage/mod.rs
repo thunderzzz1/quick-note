@@ -1,6 +1,7 @@
 pub mod categories;
 pub mod db;
 pub mod notes;
+pub mod rebuild;
 pub mod suggestions;
 
 use rusqlite::Connection;

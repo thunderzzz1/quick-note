@@ -1,5 +1,5 @@
 use crate::io_atomic::atomic_write;
-use crate::paths::{derive_attachment_dir, derive_note_path, join_under};
+use crate::paths::{derive_note_path, join_under};
 use std::path::Path;
 
 pub fn generate_id(now: &chrono::DateTime<chrono::FixedOffset>) -> String {
@@ -85,7 +85,6 @@ pub fn save_pasted_image(
     if !extension_matches_mime(original_filename, ext) {
         return Err("图片扩展名与文件类型不一致".into());
     }
-    let dir = derive_attachment_dir(root, note_id);
     let (year, month) = (&note_id[0..4], &note_id[4..6]);
 
     let mut index = 1usize;
