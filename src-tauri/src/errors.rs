@@ -23,4 +23,10 @@ impl From<rusqlite::Error> for AppError {
     }
 }
 
+impl From<reqwest::Error> for AppError {
+    fn from(e: reqwest::Error) -> Self {
+        Self::new(format!("network error: {e}"))
+    }
+}
+
 pub type AppResult<T> = Result<T, AppError>;
