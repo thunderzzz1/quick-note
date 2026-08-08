@@ -5,6 +5,7 @@ import type {
   PastedImage,
   SaveNoteResult,
   Suggestion,
+  OrgRunResult,
 } from '../types';
 
 export const api = {
@@ -36,6 +37,7 @@ export const api = {
     }),
   skipSuggestion: (id: number) => invoke<void>('skip_suggestion', { suggestionId: id }),
   acceptAll: (date: string) => invoke<number>('accept_all', { date }),
+  runAiOrg: () => invoke<OrgRunResult>('run_ai_org'),
   getSettings: () => invoke<SettingsDto>('get_settings'),
   updateSettings: (s: SettingsDto) => invoke<void>('update_settings', { s }),
   initDataDir: (dir: string) => invoke<void>('init_data_dir', { dir }),

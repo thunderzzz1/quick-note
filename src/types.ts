@@ -43,3 +43,9 @@ export interface Suggestion {
   status: 'suggested' | 'accepted' | 'adjusted' | 'skipped';
   created_at: string;
 }
+
+export interface OrgRunResult {
+  processed: number;
+  suggested: number;
+  failed: string[];
+}
